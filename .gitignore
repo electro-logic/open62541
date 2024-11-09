@@ -91,3 +91,4 @@ debian/*
 
 # project local vim settings
 .vim/
+/.vs
