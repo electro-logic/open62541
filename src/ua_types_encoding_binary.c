@@ -895,10 +895,17 @@ DECODE_BINARY(ExtensionObject) {
     ret |= DECODE_DIRECT(&binTypeId, NodeId);
     ret |= DECODE_DIRECT(&encoding, Byte);
     UA_CHECK_STATUS(ret, UA_NodeId_clear(&binTypeId); return ret);
-
+    
     switch(encoding) {
     case UA_EXTENSIONOBJECT_ENCODED_BYTESTRING:
-        ret = ExtensionObject_decodeBinaryContent(dst, &binTypeId, ctx);
+        #ifdef UA_ENABLE_TYPES_DECODING
+            ret = ExtensionObject_decodeBinaryContent(dst, &binTypeId, ctx);
+        #else
+            // take the binary content
+            dst->encoding = UA_EXTENSIONOBJECT_ENCODED_BYTESTRING;
+            UA_NodeId_copy(&binTypeId, &dst->content.encoded.typeId);
+            ret = DECODE_DIRECT(&dst->content.encoded.body, String); /* ByteString */
+        #endif
         UA_NodeId_clear(&binTypeId);
         break;
     case UA_EXTENSIONOBJECT_ENCODED_NOBODY:
@@ -917,7 +924,6 @@ DECODE_BINARY(ExtensionObject) {
         ret = UA_STATUSCODE_BADDECODINGERROR;
         break;
     }
-
     return ret;
 }
 
@@ -1189,6 +1195,7 @@ DECODE_BINARY(Variant) {
     /* Decode the content */
     dst->type = &UA_TYPES[typeKind];
     if(!isArray) {
+#ifdef UA_ENABLE_TYPES_DECODING
         /* Decode scalar */
         if(typeKind != UA_DATATYPEKIND_EXTENSIONOBJECT) {
             dst->data = UA_new(dst->type);
@@ -1197,7 +1204,13 @@ DECODE_BINARY(Variant) {
         } else {
             ret = Variant_decodeBinaryUnwrapExtensionObject(dst, ctx);
         }
+#else
+        dst->data = UA_new(dst->type);
+        UA_CHECK_MEM(dst->data, ctx->depth--; return UA_STATUSCODE_BADOUTOFMEMORY);
+        ret = decodeBinaryJumpTable[typeKind](dst->data, dst->type, ctx);
+#endif
     } else {
+#ifdef UA_ENABLE_TYPES_DECODING
         /* Decode array */
         if(typeKind != UA_DATATYPEKIND_EXTENSIONOBJECT) {
             ret = Array_decodeBinary(&dst->data, &dst->arrayLength, dst->type, ctx);
@@ -1205,7 +1218,9 @@ DECODE_BINARY(Variant) {
             ret = Variant_decodeBinaryUnwrapExtensionObjectArray(&dst->data, &dst->arrayLength,
                                                                  &dst->type, ctx);
         }
-
+#else
+        ret = Array_decodeBinary(&dst->data, &dst->arrayLength, dst->type, ctx);
+#endif
         /* Decode array dimensions */
         if((encodingByte & (u8)UA_VARIANT_ENCODINGMASKTYPE_DIMENSIONS) > 0) {
             ret |= Array_decodeBinary((void**)&dst->arrayDimensions, &dst->arrayDimensionsSize,
