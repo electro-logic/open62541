@@ -1234,23 +1234,32 @@ FUNC_DECODE_BINARY(Variant) {
     /* Decode the content */
     dst->type = &UA_TYPES[typeKind];
     if(!isArray) {
-        /* Decode scalar */
-        if(typeKind != UA_DATATYPEKIND_EXTENSIONOBJECT) {
+        #ifdef UA_ENABLE_TYPES_DECODING
+            /* Decode scalar */
+            if(typeKind != UA_DATATYPEKIND_EXTENSIONOBJECT) {
+                dst->data = ctxCalloc(ctx, 2, dst->type->memSize);
+                UA_CHECK_MEM(dst->data, ctx->depth--; return UA_STATUSCODE_BADOUTOFMEMORY);
+                ret = decodeBinaryJumpTable[typeKind](ctx, dst->data, dst->type);
+            } else {
+                ret = Variant_decodeBinaryUnwrapExtensionObject(ctx, dst);
+            }
+        #else
             dst->data = ctxCalloc(ctx, 2, dst->type->memSize);
             UA_CHECK_MEM(dst->data, ctx->depth--; return UA_STATUSCODE_BADOUTOFMEMORY);
             ret = decodeBinaryJumpTable[typeKind](ctx, dst->data, dst->type);
-        } else {
-            ret = Variant_decodeBinaryUnwrapExtensionObject(ctx, dst);
-        }
+        #endif
     } else {
         /* Decode array */
-        if(typeKind != UA_DATATYPEKIND_EXTENSIONOBJECT) {
+        #ifdef UA_ENABLE_TYPES_DECODING
+            if(typeKind != UA_DATATYPEKIND_EXTENSIONOBJECT) {
+                ret = Array_decodeBinary(ctx, &dst->data, &dst->arrayLength, dst->type);
+            } else {
+                ret = Variant_decodeBinaryUnwrapExtensionObjectArray(ctx, &dst->data,
+                                                                    &dst->arrayLength, &dst->type);
+            }
+        #else
             ret = Array_decodeBinary(ctx, &dst->data, &dst->arrayLength, dst->type);
-        } else {
-            ret = Variant_decodeBinaryUnwrapExtensionObjectArray(ctx, &dst->data,
-                                                                 &dst->arrayLength, &dst->type);
-        }
-
+        #endif
         /* Decode array dimensions */
         if((encodingByte & (u8)UA_VARIANT_ENCODINGMASKTYPE_DIMENSIONS) > 0) {
             ret |= Array_decodeBinary(ctx, (void **)&dst->arrayDimensions,
