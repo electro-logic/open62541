@@ -13,6 +13,14 @@ endif()
 # cmake -DUA_NAMESPACE_ZERO=FULL ..
 # make -j
 
+if(MSVC)    
+    add_compile_options(
+        $<$<CONFIG:>:/MD>
+        $<$<CONFIG:Debug>:/MDd>
+        $<$<CONFIG:Release>:/MD>
+    )    
+endif()
+
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     # Examples are built standalone. Find installed open62541
 
