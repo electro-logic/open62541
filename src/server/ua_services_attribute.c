@@ -1927,7 +1927,7 @@ Service_HistoryRead(UA_Server *server, UA_Session *session,
         return;
     }
     #ifndef UA_ENABLE_TYPES_DECODING
-        UA_ExtensionObject_decode(request->historyReadDetails);
+        UA_ExtensionObject_decode(&request->historyReadDetails);
     #endif
     if(request->historyReadDetails.encoding != UA_EXTENSIONOBJECT_DECODED) {
         response->responseHeader.serviceResult = UA_STATUSCODE_BADNOTSUPPORTED;
@@ -2045,7 +2045,7 @@ Service_HistoryUpdate(UA_Server *server, UA_Session *session,
     for(size_t i = 0; i < request->historyUpdateDetailsSize; ++i) {
         UA_HistoryUpdateResult_init(&response->results[i]);
         #ifndef UA_ENABLE_TYPES_DECODING
-            UA_ExtensionObject_decode(request->historyUpdateDetails[i]);
+            UA_ExtensionObject_decode(&request->historyUpdateDetails[i]);
         #endif
         if(request->historyUpdateDetails[i].encoding != UA_EXTENSIONOBJECT_DECODED) {
             response->results[i].statusCode = UA_STATUSCODE_BADNOTSUPPORTED;
