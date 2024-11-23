@@ -1085,8 +1085,10 @@ processDataChangeNotification(UA_Client *client, UA_Client_Subscription *sub,
     UA_LOCK_ASSERT(&client->clientMutex, 1);
 
     if(sub->dataChangeCallback) {
+        UA_UNLOCK(&client->clientMutex);
         sub->dataChangeCallback(client, sub->subscriptionId, sub->context,
                                 dataChangeNotification);
+        UA_LOCK(&client->clientMutex);
         return;
     }
 
