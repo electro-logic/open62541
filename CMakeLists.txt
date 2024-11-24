@@ -548,7 +548,7 @@ endif()
 
 if(MINGW)
     # GCC stack protector support
-    list(APPEND open62541_LIBRARIES ssp)
+    list(APPEND open62541_LIBRARIES ws2_32 ssp)
 endif()
 
 #####################
@@ -880,6 +880,7 @@ endif()
 
 if (NOT "${UA_ARCHITECTURE}" STREQUAL "none")
     list(PREPEND lib_headers ${PROJECT_SOURCE_DIR}/arch/posix/ua_architecture.h)
+    list(PREPEND lib_headers ${PROJECT_SOURCE_DIR}/arch/win32/ua_architecture.h)
 endif()
 
 if(UA_ENABLE_PARSING)
@@ -967,7 +968,6 @@ set(architecture_sources)
 
 if(NOT "${UA_ARCHITECTURE}" STREQUAL "none")
     list(APPEND architecture_headers
-         ${PROJECT_SOURCE_DIR}/arch/win32/ua_architecture.h
          ${PROJECT_SOURCE_DIR}/arch/common/ua_timer.h
          ${PROJECT_SOURCE_DIR}/arch/eventloop_common.h
          ${PROJECT_SOURCE_DIR}/arch/eventloop_posix.h)
@@ -1046,7 +1046,7 @@ if(UA_ENABLE_ENCRYPTION_MBEDTLS OR UA_ENABLE_PUBSUB_ENCRYPTION OR UA_ENABLE_AMAL
 endif()
 
 if(UA_ENABLE_PUBSUB_ENCRYPTION)
-  list(INSERT plugin_sources 1
+  list(APPEND plugin_sources
        ${PROJECT_SOURCE_DIR}/plugins/crypto/mbedtls/securitypolicy_pubsub_aes128ctr.c
        ${PROJECT_SOURCE_DIR}/plugins/crypto/mbedtls/securitypolicy_pubsub_aes256ctr.c)
 endif()
@@ -1056,12 +1056,13 @@ if(UA_ENABLE_ENCRYPTION_MBEDTLS OR UA_ENABLE_ENCRYPTION_OPENSSL OR UA_ENABLE_ENC
 endif()
 
 if(UA_ENABLE_ENCRYPTION_MBEDTLS OR UA_ENABLE_AMALGAMATION)
-list(INSERT plugin_sources 1
+list(APPEND plugin_sources
      ${PROJECT_SOURCE_DIR}/plugins/crypto/mbedtls/ua_securitypolicy_basic128rsa15.c
      ${PROJECT_SOURCE_DIR}/plugins/crypto/mbedtls/ua_securitypolicy_basic256.c
      ${PROJECT_SOURCE_DIR}/plugins/crypto/mbedtls/ua_securitypolicy_basic256sha256.c
      ${PROJECT_SOURCE_DIR}/plugins/crypto/mbedtls/ua_securitypolicy_aes128sha256rsaoaep.c
      ${PROJECT_SOURCE_DIR}/plugins/crypto/mbedtls/ua_securitypolicy_aes256sha256rsapss.c
+     ${PROJECT_SOURCE_DIR}/plugins/crypto/mbedtls/ua_mbedtls_create_certificate.c
      ${PROJECT_SOURCE_DIR}/plugins/crypto/mbedtls/ua_pki_mbedtls.c)
 endif()
 
@@ -1072,7 +1073,7 @@ list(INSERT plugin_sources 0
 endif()
 
 if(UA_ENABLE_ENCRYPTION_OPENSSL OR UA_ENABLE_ENCRYPTION_LIBRESSL OR UA_ENABLE_AMALGAMATION)
-list(INSERT plugin_sources 0
+list(APPEND plugin_sources
      ${PROJECT_SOURCE_DIR}/plugins/crypto/openssl/securitypolicy_openssl_common.h
      ${PROJECT_SOURCE_DIR}/plugins/crypto/openssl/ua_openssl_version_abstraction.h
      ${PROJECT_SOURCE_DIR}/plugins/crypto/openssl/securitypolicy_openssl_common.c
@@ -1117,17 +1118,22 @@ endif()
 set(UA_FILE_NODESETS) # List of nodeset-xml files to be considered in the generated information model
 set(UA_NODESET_DIR ${PROJECT_SOURCE_DIR}/deps/ua-nodeset CACHE STRING "The path to the node-set directory (e.g. from https://github.com/OPCFoundation/UA-Nodeset)")
 
+unset(UA_FILE_NS0_PRIVATE)
+if(UA_FILE_NS0)
+    set(UA_FILE_NS0_PRIVATE "${UA_FILE_NS0}")
+endif()
+
 if(UA_NAMESPACE_ZERO STREQUAL "FULL")
     # Use the "full" schema files also for datatypes and statuscodes
     set(UA_SCHEMA_DIR ${UA_NODESET_DIR}/Schema CACHE INTERNAL "")
 
     # Set the full Nodeset for NS0
-    if(NOT UA_FILE_NS0)
-        set(UA_FILE_NS0 ${UA_SCHEMA_DIR}/Opc.Ua.NodeSet2.xml CACHE INTERNAL "")
+    if(NOT UA_FILE_NS0_PRIVATE)
+        set(UA_FILE_NS0_PRIVATE ${UA_SCHEMA_DIR}/Opc.Ua.NodeSet2.xml)
     endif()
 
     # Check that the submodule was checked out or manually downloaded into the folder
-    if(NOT EXISTS "${UA_FILE_NS0}")
+    if(NOT EXISTS "${UA_FILE_NS0_PRIVATE}")
         message(STATUS "Submodule update")
         execute_process(COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive
                         RESULT_VARIABLE GIT_SUBMOD_RESULT)
@@ -1140,8 +1146,8 @@ else()
     set(UA_SCHEMA_DIR ${PROJECT_SOURCE_DIR}/tools/schema CACHE INTERNAL "")
 
     # Set the reduced Nodeset for NS0
-    if(NOT UA_FILE_NS0)
-        set(UA_FILE_NS0 ${UA_SCHEMA_DIR}/Opc.Ua.NodeSet2.Reduced.xml CACHE INTERNAL "")
+    if(NOT UA_FILE_NS0_PRIVATE)
+        set(UA_FILE_NS0_PRIVATE ${UA_SCHEMA_DIR}/Opc.Ua.NodeSet2.Reduced.xml CACHE INTERNAL "")
     endif()
 
     # Set feature-specific datatypes definitions and nodesets
@@ -1191,7 +1197,7 @@ else()
     endif()
 endif()
 
-list(INSERT UA_FILE_NODESETS 0 "${UA_FILE_NS0}")
+list(INSERT UA_FILE_NODESETS 0 "${UA_FILE_NS0_PRIVATE}")
 set(UA_FILE_NODEIDS ${UA_SCHEMA_DIR}/NodeIds.csv)
 set(UA_FILE_STATUSCODES ${UA_SCHEMA_DIR}/StatusCode.csv)
 set(UA_FILE_TYPES_BSD ${UA_SCHEMA_DIR}/Opc.Ua.Types.bsd)
@@ -1217,7 +1223,6 @@ ua_generate_datatypes(INTERNAL NAME "transport" TARGET_SUFFIX "transport" NAMESP
 # statuscode explanation
 add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/src_generated/open62541/statuscodes.h
                           ${PROJECT_BINARY_DIR}/src_generated/open62541/statuscodes.c
-                   PRE_BUILD
                    COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/generate_statuscode_descriptions.py
                            ${UA_FILE_STATUSCODES} ${PROJECT_BINARY_DIR}/src_generated/open62541/statuscodes
                    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_statuscode_descriptions.py
@@ -1237,7 +1242,6 @@ add_custom_target(open62541-generator-statuscode DEPENDS
 if(UA_ENABLE_AMALGAMATION)
     # single-file release
     add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/open62541.h
-                       PRE_BUILD
                        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/amalgamate.py
                                ${OPEN62541_VERSION} ${CMAKE_CURRENT_BINARY_DIR}/open62541.h
                                ${exported_headers} ${plugin_headers}
@@ -1245,7 +1249,6 @@ if(UA_ENABLE_AMALGAMATION)
                                ${exported_headers} ${plugin_headers})
 
     add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/open62541.c
-                       PRE_BUILD
                        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/amalgamate.py
                                ${OPEN62541_VERSION} ${CMAKE_CURRENT_BINARY_DIR}/open62541.c
                                ${lib_headers} ${lib_sources} ${plugin_sources} ${architecture_headers} ${architecture_sources}
@@ -1269,7 +1272,7 @@ if(UA_ENABLE_NODESET_INJECTOR)
     message(STATUS "Nodesetinjector feature enabled")
     cmake_minimum_required(VERSION 3.20)
     add_custom_command(OUTPUT ${PROJECT_BINARY_DIR}/src_generated/open62541/nodesetinjector.h
-                       ${PROJECT_BINARY_DIR}/src_generated/open62541/nodesetinjector.c PRE_BUILD
+                       ${PROJECT_BINARY_DIR}/src_generated/open62541/nodesetinjector.c
                        COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/nodeset_injector/generate_nodesetinjector.py
                        ${PROJECT_BINARY_DIR}/src_generated/open62541/nodesetinjector)
     add_custom_target(open62541-generator-nodesetinjector DEPENDS
