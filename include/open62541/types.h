@@ -751,7 +751,7 @@ typedef struct {
  * @return Is the variant empty */
 UA_INLINABLE(UA_Boolean
              UA_Variant_isEmpty(const UA_Variant *v), {
-    return v->type == NULL;
+    return v->type == NULL || v->data == UA_EMPTY_ARRAY_SENTINEL;
 })
 
 /* Returns true if the variant contains a scalar value. Note that empty variants
