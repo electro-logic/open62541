@@ -369,10 +369,10 @@ processERRResponse(UA_Client *client, const UA_ByteString *chunk) {
         closeSecureChannel(client);
         return;
     }
-    if(!UA_String_equal(&client->lastErrorMessage.reason, &UA_STRING_NULL)) {
-        UA_TcpErrorMessage_clear(&client->lastErrorMessage);
+    if(!UA_String_equal(&client->lastErrorMessage, &UA_STRING_NULL)) {
+        UA_String_clear(&client->lastErrorMessage);
     }
-    UA_TcpErrorMessage_copy(&errMessage, &client->lastErrorMessage);
+    UA_String_copy(&errMessage.reason, &client->lastErrorMessage);
     UA_LOG_ERROR_CHANNEL(client->config.logging, &client->channel,
                          "Received an ERR response with StatusCode %s and the following "
                          "reason: %.*s", UA_StatusCode_name(errMessage.error),

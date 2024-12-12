@@ -943,6 +943,9 @@ UA_Client_removeCallback(UA_Client *client, UA_UInt64 callbackId);
 UA_EXPORT const UA_DataType *
 UA_Client_findDataType(UA_Client *client, const UA_NodeId *typeId);
 
+UA_EXPORT const UA_String
+UA_Client_getLastErrorMessage(UA_Client *client);
+
 /**
  * .. toctree::
  *
