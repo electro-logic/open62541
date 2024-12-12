@@ -1160,3 +1160,8 @@ UA_Client_getConnectionAttribute_scalar(UA_Client *client,
     UA_UNLOCK(&client->clientMutex);
     return UA_STATUSCODE_GOOD;
 }
+
+const UA_String
+UA_Client_getLastErrorMessage(UA_Client *client) {
+    return client->lastErrorMessage;
+}

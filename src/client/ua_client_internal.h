@@ -156,7 +156,7 @@ struct UA_Client {
     /* Connectivity check */
     UA_DateTime lastConnectivityCheck;
     UA_Boolean pendingConnectivityCheck;
-    UA_TcpErrorMessage lastErrorMessage;
+    UA_String lastErrorMessage;
 
     /* Async Service */
     UA_AsyncServiceList asyncServiceCalls;
