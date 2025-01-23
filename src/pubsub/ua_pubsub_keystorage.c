@@ -208,16 +208,14 @@ UA_PubSubKeyStorage_addKeyRolloverCallback(UA_Server *server,
     if(!server || !keyStorage || !callback || timeToNextMs <= 0)
         return UA_STATUSCODE_BADINVALIDARGUMENT;
 
-    // Check if the callback already exist
-    if(*callbackID != 0) {
-        return UA_STATUSCODE_GOOD;
-    }
-    
-    UA_LOCK_ASSERT(&psm->sc.server->serviceMutex);
+    UA_LOCK_ASSERT(&server->serviceMutex, 1);
+
+    UA_EventLoop *el = server->config.eventLoop;
+    if(*callbackID != 0)
+        el->removeCyclicCallback(el, *callbackID);
 
     UA_DateTime dateTimeToNextKey = UA_DateTime_nowMonotonic() +
         (UA_DateTime)(UA_DATETIME_MSEC * timeToNextMs);
-    UA_EventLoop *el = server->config.eventLoop;
     return el->addTimedCallback(el, (UA_Callback)callback, server, keyStorage,
                                 dateTimeToNextKey, callbackID);
 }
@@ -595,12 +593,13 @@ cleanup:
                      UA_StatusCode_name(retval));
     }
     /* call user callback to notify about the status */
-    UA_UNLOCK(&server->serviceMutex);
     if(ks->sksConfig.userNotifyCallback)
         ks->sksConfig.userNotifyCallback(server, retval, ks->sksConfig.context);
     ks->sksConfig.reqId = 0;
     UA_Client_disconnectAsync(client);
     addDelayedSksClientCleanupCb(client, ctx);
+
+    UA_UNLOCK(&server->serviceMutex);
 }
 
 static UA_StatusCode
